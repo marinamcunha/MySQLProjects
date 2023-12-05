@@ -1,0 +1,407 @@
+With dados as (
+
+SELECT
+t2.TMS_TR_LOGISTIC_CENTER_ID as XD,
+t1.SHP_PICKING_TYPE_ID as Picking_type,
+t1.shp_shipment_id as Numero_do_pedido,
+t2.TMS_TR_PACKINGLIST_NUMBER as HU_Outbound,
+t2.shp_label_carrier_name as Carrier,
+t2.shp_method_type as Metodo_entrega,
+CASE WHEN t8.SHP_LG_FACILITY_ID = 'SC_ZS' THEN 'SSP1' ELSE t8.SHP_LG_FACILITY_ID END Primeira_autorizacao,
+UPPER(shp_label_zone_name) as Autorizacao_final,
+t10.shp_carrier_id as Transportadora,
+t3.cus_city as Cidade_seller,
+t3.cus_state as Estado_seller,
+t1.shp_sender_id as Cust_ID,
+t3.cus_nickname as Seller,
+t11.shp_add_state_name as Receiver_State,
+t11.shp_add_zip_code as Receiver_Zip_Code,
+t1.shp_status_id as Status,
+FOS.OOT.SLA AS sla_OOT,
+t6.SHP_HAND_TIME_DEVIATION_TYPE as HT,
+t6.SHP_HAND_TIME_DEVIATION_DAYS as HT_Deviation,
+t6.SHP_TIME_DEVIATION_DAYS_TYPE as ST,
+t6.SHP_LEAD_TIME_DEVIATION_TYPE as Lead_time,
+t7.est_delivery_date + interval '21' hour + interval'59' minute + interval '59' second as Promessa_Original,
+t8.SHP_LG_PROMISE_DT_FROM + interval '1' hour as Promessa_Recalculada,
+t7.EST_DELIVERY_OFFSET_DATE + interval '1' hour as Promessa_final,
+t1.SHP_DATETIME_CREATED_ID + interval '1' hour as Criacao_do_pedido,
+t1.SHP_DATETIME_HANDLING_ID + interval '1' hour as Pagamento,
+t1.SHP_DATETIME_READY_TO_SHIP_ID + interval '1' hour as Pronto_para_coleta,
+t1.SHP_DATE_FIRST_PRINTED_ID + Interval '1'Hour as Impressao_de_etiqueta,
+t5.chk_date + interval '1' hour as Coletado,
+t9.chk_date + interval '1' hour as Dropado,
+t6.SHP_IN_HUB_TIME_DATE as In_HUB,
+DATETIME(TIMESTAMP_SUB(TIMESTAMP(FOS.OOT.SHIPPED_DATE), INTERVAL -4 HOUR), 'America/Sao_Paulo') AS Shipped,
+DATETIME(TIMESTAMP_SUB(TIMESTAMP(FOS.OOT.CTP_DATE), INTERVAL -4 HOUR),'America/Sao_Paulo') as CPT,
+MIN(CON.SHP_LG_SHIPMENT_CHK_DT + interval'1' hour) as Entrada_SVC,
+MIN(DIS.SHP_LG_SHIPMENT_CHK_DT + interval'1' hour) as Despacho_SVC,
+MIN(DLV.SHP_LG_SHIPMENT_CHK_DT + interval'1' hour) as Entrega,
+cast(coalesce(t1.shp_date_first_visit_id,t1.shp_date_delivered_id) as date) as Primeira_visita_Entrega,
+UPPER(t2.TMS_TR_DIS_TRUCK_ID) as Placa_LH,
+t1.SHP_RECEIVER_CITY_NAME as Cidade_Buyer,
+Place_id,
+t13.XPT as XPT, 
+CASE WHEN (UPPER(oot.SUBCANALIZATION) like '%A' or oot.LAST_MILE_CARRIER like 'Air') then 'Aéreo' else 'Rodo' end Modal,
+CASE WHEN step2.FACILITY_ID is null then
+  (CASE WHEN step2byshp.FACILITY_ID is null then
+   (CASE WHEN t8.SHP_LG_FACILITY_ID = 'SC_ZS' THEN 'SSP1' ELSE t8.SHP_LG_FACILITY_ID END) else step2byshp.FACILITY_ID END) else step2.FACILITY_ID end Destino_Step1,
+CASE WHEN step2.HU is null then step2byshp.HU_ID else step2.HU end HU_Cons1,
+CASE WHEN step2.INHUB_DT is null then step2byshp.INHUB_DT ELSE step2.INHUB_DT END Inhub_Cons1,
+CASE WHEN step2.CPT_OPS_DT is null then step2byshp.CPT_OPS_DT ELSE step2.CPT_OPS_DT END CPT_Cons1,
+CASE WHEN step2.SHIPPED_DT is null then step2byshp.SHIPPED_DT ELSE step2.SHIPPED_DT END Shipped_Cons1,
+CASE WHEN UPPER(step2.Placa_LH_Cons) is null then UPPER(step2byshp.Placa_LH_Cons) ELSE UPPER(step2.Placa_LH_Cons) END Placa_LH_Cons1,
+CASE WHEN (step3.FACILITY_ID is null and (step2.FACILITY_ID is not null OR step2byshp.FACILITY_ID is not null)) then
+  (CASE WHEN (step3byshp.FACILITY_ID is null and (step2.FACILITY_ID is not null OR step2byshp.FACILITY_ID is not null)) then (CASE WHEN t8.SHP_LG_FACILITY_ID = 'SC_ZS' THEN 'SSP1' ELSE t8.SHP_LG_FACILITY_ID END) else step3byshp.FACILITY_ID END) else step3.FACILITY_ID end Destino_Step2,
+CASE WHEN step3.HU_ID is null then step3byshp.HU_ID else step3.HU_ID end HU_Cons2,
+CASE WHEN step3.INHUB_DT is null then step3byshp.INHUB_DT ELSE step3.INHUB_DT END Inhub_Cons2,
+CASE WHEN step3.CPT_OPS_DT is null then step3byshp.CPT_OPS_DT ELSE step3.CPT_OPS_DT END CPT_Cons2,
+CASE WHEN step3.SHIPPED_DT is null then step3byshp.SHIPPED_DT ELSE step3.SHIPPED_DT END Shipped_Cons2,
+CASE WHEN UPPER(step3.Placa_LH_Cons) is null then UPPER(step3byshp.Placa_LH_Cons) ELSE UPPER(step3.Placa_LH_Cons) END Placa_LH_Cons2,
+CASE WHEN (step3.NEXT_FACILITY_ID is null and (step3.FACILITY_ID is not null OR step3byshp.FACILITY_ID is not null)) then
+  (CASE WHEN (step3byshp.NEXT_FACILITY_ID is null and (step3.FACILITY_ID is not null OR step3byshp.FACILITY_ID is not null)) then (CASE WHEN t8.SHP_LG_FACILITY_ID = 'SC_ZS' THEN 'SSP1' ELSE t8.SHP_LG_FACILITY_ID END) else step3byshp.NEXT_FACILITY_ID END) else step3.NEXT_FACILITY_ID end Destino_Step3,
+t3.CUS_ZIP_CODE as Cep_Seller
+
+from `WHOWNER.BT_SHP_SHIPMENTS` as t1
+
+left join  `WHOWNER.BT_TMS_TRACKING` as t2 on t1.shp_shipment_id = t2.shp_shipment_id
+and t2.sit_site_id = 'MLB'
+and cast (TMS_TR_COLLECT_LIST_DATE as date) >= (current_date - 60)
+
+left join `WHOWNER.LK_CUS_CUSTOMERS_DATA` as t3 on t1.shp_sender_id = t3.cus_cust_id
+
+left join
+(select SHP_SHIPMENT_ID, shp_sub_status, shp_checkpoint_date as chk_date
+from `WHOWNER.BT_SHP_ELASTICSEARCH_CHECKPOINTS`
+where shp_sub_status IN ('picked_up') 
+and shp_checkpoint_date >= (current_date - 60)
+) as t5 on t5.SHP_SHIPMENT_ID = t1.shp_shipment_id
+
+left join
+(select SHP_SHIPMENT_ID, shp_sub_status, shp_checkpoint_date as chk_date
+from `WHOWNER.BT_SHP_ELASTICSEARCH_CHECKPOINTS`
+where shp_sub_status IN ('dropped_off') 
+and shp_checkpoint_date >= (current_date - 60)
+) t9 on t9.SHP_SHIPMENT_ID = t1.shp_shipment_id
+
+left join 
+(select shp_shipment_id, 
+  max(SHP_AGENCY_ID) as Place_id,
+  min(case when shp_sub_status IN ('dropped_off') then shp_checkpoint_date else null end) as dropped_chk_date,
+  min(case when shp_sub_status IN ('picked_up') then shp_checkpoint_date else null end) as pick_chk_date
+  from `WHOWNER.BT_SHP_ELASTICSEARCH_CHECKPOINTS` 
+  where shp_sub_status IN ('picked_up','dropped_off') 
+  and shp_checkpoint_date >= (current_date - 60)
+  group by 1
+  ) as t12 on t12.shp_shipment_id = t1.shp_shipment_id
+
+left join `WHOWNER.LK_SHP_SHIPMENTS_TIMES` as t6 on t1.shp_shipment_id = t6.shp_shipment_id
+
+left join `WHOWNER.LK_SHP_ORIGINAL_PROMISE` as t7 on t1.shp_shipment_id = t7.shp_shipment_id
+left join `WHOWNER.BT_SHP_LG_SHIPMENTS` as t8 on t1.shp_shipment_id = t8.shp_shipment_id
+left join `WHOWNER.LK_SHP_SHIPPING_SERVICES` as t10 on t1.shp_service_id = t10.shp_service_id
+LEFT JOIN `WHOWNER.LK_SHP_ADDRESS` as t11 on t1.shp_receiver_address = t11.SHP_ADD_ID
+
+LEFT JOIN `WHOWNER.BT_SHP_LG_SHIPMENT_CHECKPOINTS` CON
+ON CON.SHP_SHIPMENT_ID = t1.SHP_SHIPMENT_ID
+AND CON.SHP_LG_STATUS = 'at_station'
+AND CON.SHP_LG_SUB_STATUS = 'sorting'
+
+LEFT JOIN `WHOWNER.BT_SHP_LG_SHIPMENT_CHECKPOINTS` DLV
+ON DLV.SHP_SHIPMENT_ID = t1.SHP_SHIPMENT_ID
+AND DLV.SHP_LG_STATUS = 'on_route'
+AND DLV.SHP_LG_SUB_STATUS = 'delivered'
+
+LEFT JOIN `WHOWNER.BT_SHP_LG_SHIPMENT_CHECKPOINTS` DIS
+ON DIS.SHP_SHIPMENT_ID = t1.SHP_SHIPMENT_ID
+AND DIS.SHP_LG_STATUS = 'on_route'
+AND DIS.SHP_LG_SUB_STATUS IS NULL
+
+LEFT JOIN `SHIPPING_BI.BT_SHP_MT_FOS_METRICS` as FOS
+ON FOS.ENTITY_ID = cast(t1.SHP_SHIPMENT_ID as string)
+AND FOS.SITE_ID = 'MLB' AND t2.TMS_TR_LOGISTIC_CENTER_ID = FOS.FACILITY_ID
+
+LEFT JOIN `SBOX_MLB_FORECASTING.LTPromiseBase` as t13
+ON cast(t13.shp_shipment_id as integer) = t1.SHP_SHIPMENT_ID
+
+left join `SHIPPING_BI.OPS_SHIPMENTS_STEPS_OOT` as oot
+on oot.SHP_SHIPMENT_ID = t1.SHP_SHIPMENT_ID AND oot.FACILITY_ID = t2.TMS_TR_LOGISTIC_CENTER_ID
+
+left join(
+select
+ SHIPMENT_ID AS SHIPMENT_ID
+, HU.ID AS HU
+, STEP.LOGISTIC_CENTER_ID AS FACILITY_ID
+, HU.EVENT_DATE.CHECKIN_ACCEPT AS INHUB_DT
+, HU.EVENT_DATE.SHIPPED AS SHIPPED_DT
+, HU.VEHICLE_PLATE AS Placa_LH_Cons
+, HU.CPT AS CPT_OPS_DT
+
+from `SHIPPING_BI.BT_SHP_MT_HU_MONITOREO` as t1, unnest(HU.SHIPMENT_IDS) SHIPMENT_ID
+
+WHERE STEP.ORDER = 2) step2 on step2.HU = t2.TMS_TR_PACKINGLIST_NUMBER
+
+/*
+left join
+(SELECT
+SHIPMENTS
+, HU_ID
+, FACILITY_ID
+, HU.EVENT_DATE.CHECKIN_ACCEPT as INHUB_DT
+, CPT_OPS_DT
+, HU.EVENT_DATE.SHIPPED as SHIPPED_DT
+, looker.HU.VEHICLE_PLATE as Placa_LH_Cons
+
+FROM `SHIPPING_BI.OPS_SHIPMENTS_STEPS_OOT` oot
+LEFT JOIN `SHIPPING_BI.BT_SHP_MT_HU_MONITOREO` looker on oot.HU_ID = looker.HU.ID and oot.FACILITY_ID = looker.LOGISTIC_CENTER_ID
+WHERE looker.STEP.ORDER = 2) step2 on step2.HU_ID = t2.TMS_TR_PACKINGLIST_NUMBER */
+
+left join
+(SELECT
+SHP_SHIPMENT_ID
+, HU_ID
+, FACILITY_ID
+, INHUB_DT
+, CPT_OPS_DT
+, SHIPPED_DT
+, looker.HU.VEHICLE_PLATE as Placa_LH_Cons
+
+FROM `SHIPPING_BI.OPS_SHIPMENTS_STEPS_OOT` oot
+LEFT JOIN `SHIPPING_BI.BT_SHP_MT_HU_MONITOREO` looker on oot.HU_ID = looker.HU.ID and oot.FACILITY_ID = looker.LOGISTIC_CENTER_ID
+WHERE oot.STEP = 2 ) step2byshp on step2byshp.SHP_SHIPMENT_ID = t1.SHP_SHIPMENT_ID
+
+left join
+(SELECT
+SHP_SHIPMENT_ID
+, HU_ID
+, FACILITY_ID
+, NEXT_FACILITY_ID
+, HU.EVENT_DATE.CHECKIN_ACCEPT as INHUB_DT
+, CPT_OPS_DT
+, HU.EVENT_DATE.SHIPPED as SHIPPED_DT
+, looker.HU.VEHICLE_PLATE as Placa_LH_Cons
+
+FROM `SHIPPING_BI.OPS_SHIPMENTS_STEPS_OOT` oot
+LEFT JOIN `SHIPPING_BI.BT_SHP_MT_HU_MONITOREO` looker on oot.HU_ID = looker.HU.ID and oot.FACILITY_ID = looker.LOGISTIC_CENTER_ID
+WHERE looker.STEP.ORDER = 3 ) step3 on step3.HU_ID = t2.TMS_TR_PACKINGLIST_NUMBER
+
+left join
+(SELECT
+SHP_SHIPMENT_ID
+, HU_ID
+, FACILITY_ID
+, NEXT_FACILITY_ID
+, INHUB_DT
+, CPT_OPS_DT
+, SHIPPED_DT
+, looker.HU.VEHICLE_PLATE as Placa_LH_Cons
+
+FROM `SHIPPING_BI.OPS_SHIPMENTS_STEPS_OOT` oot
+LEFT JOIN `SHIPPING_BI.BT_SHP_MT_HU_MONITOREO` looker on oot.HU_ID = looker.HU.ID and oot.FACILITY_ID = looker.LOGISTIC_CENTER_ID
+WHERE oot.STEP = 3 ) step3byshp on step3byshp.SHP_SHIPMENT_ID = t1.SHP_SHIPMENT_ID
+
+WHERE
+t1.SHP_PICKING_TYPE_ID in ('cross_docking','xd_drop_off')
+and t1.SHP_TYPE = 'forward'
+and t1.SIT_SITE_ID = 'MLB'
+and t6.SHP_LEAD_TIME_DEVIATION_TYPE = 'delay'
+and t1.SHP_DATE_FIRST_VISIT_ID between '2023-01-01' and '2023-01-30'
+and t2.TMS_TR_LOGISTIC_CENTER_ID in  ()
+group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56
+),
+
+FM as (with fmile as (SELECT
+C.SHP_CO_SITE_ID AS SIT_SITE_ID,
+LG.SHP_LG_ROUTE_ID,
+LG.SHP_LG_CODE AS Rota_FM,
+CAST(SHIPPING_BI.FN_API_TIMEZONE(C.SHP_CO_SITE_ID, LG.SHP_LG_DATE_CREATED) AS DATE) AS ROUTE_DATE,
+RS.SHP_LG_STOP_ID,
+TU.SHP_LG_TR_RELATED_ENTITY_ID AS SHP_SHIPMENT_ID,
+ROW_NUMBER() over (partition by TU.SHP_LG_TR_RELATED_ENTITY_ID order by LG.SHP_LG_DATE_CREATED DESC) as Rnk
+
+FROM
+WHOWNER.LK_SHP_LG_ROUTES LG
+INNER JOIN WHOWNER.LK_SHP_LG_ROUTE_STOP AS RS ON RS.SHP_LG_ROUTE_ID = LG.SHP_LG_ROUTE_ID AND SHP_LG_STOP_TYPE = 'operational'
+INNER JOIN WHOWNER.BT_SHP_LG_ORDER AS O ON (O.SHP_LG_ROUTE_STOP_ID = RS.SHP_LG_STOP_ID)
+INNER JOIN WHOWNER.LK_SHP_COMPANIES AS C ON (C.SHP_COMPANY_ID = LG.SHP_COMPANY_ID)
+INNER JOIN WHOWNER.LK_SHP_LG_ORDER_TU AS OTU ON (OTU.SHP_LG_ORDER_ID = O.SHP_LG_ORDER_ID)
+INNER JOIN WHOWNER.LK_SHP_LG_TRANSPORT_UNIT AS TU ON
+(OTU.SHP_LG_TRANSPORT_UNIT_ID = TU.SHP_LG_TRANSPORT_UNIT_ID
+AND TU.SHP_LG_TR_STEP_TYPE = 'first_mile')
+WHERE 1=1
+AND LG.SHP_LG_TYPE = 'first_mile'
+AND C.SHP_CO_SITE_ID = 'MLB')
+
+select Rota_FM,SHP_SHIPMENT_ID from fmile where Rnk = 1),
+
+MM as (
+with lh as (
+
+SELECT DISTINCT
+step.SHP_LG_ROUTE_ID AS ROUTE_ID
+, step.SHP_LG_SEQUENCE as STEP
+, start.SHP_LG_STOP_FACILITY_ID as ORIGEM_TRECHO
+, CASE WHEN finish.SHP_LG_STOP_FACILITY_ID = 'SC_ZS' THEN 'SSP1'
+ELSE finish.SHP_LG_STOP_FACILITY_ID END DESTINO_TRECHO
+, tu.SHP_LG_RELATED_ENTITY_ID as HU
+
+FROM `WHOWNER.BT_LG_MIDDLE_MILE_STEP` step
+LEFT JOIN `WHOWNER.BT_LG_MIDDLE_MILE_STOP` start on step.SHP_LG_STEP_ORIGIN_STOP_ID = start.SHP_LG_STOP_ID
+LEFT JOIN `WHOWNER.BT_LG_MIDDLE_MILE_STOP` finish on step.SHP_LG_STEP_DESTINATION_STOP_ID = finish.SHP_LG_STOP_ID
+LEFT JOIN `WHOWNER.BT_LG_MIDDLE_MILE_ORDER` pickup on pickup.ORD_ORDER_ID = start.PICKUP_ORDER_ID and start.PICKUP_ORDER_ID is not null
+LEFT JOIN `WHOWNER.BT_LG_MIDDLE_MILE_ORDER_TRANS_UNIT` tupu on tupu.ORD_ORDER_ID = pickup.ORD_ORDER_ID
+LEFT join `WHOWNER.BT_LG_MIDDLE_MILE_TRANS_UNIT` tu on tu.SGP_LG_TRANSPORT_UNIT_ID = tupu.SGP_LG_TRANSPORT_UNIT_ID and tu.SHP_LG_RELATED_ENTITY_TYPE = 'pallet'
+
+WHERE 1=1
+
+and SHP_LG_STEP_CREATED_DTTM BETWEEN current_date - 60 and current_date
+and tu.SHP_LG_RELATED_ENTITY_ID is not null
+and step.SIT_SITE_ID = 'MLB'
+
+union all (
+
+SELECT DISTINCT
+step.SHP_LG_ROUTE_ID AS ROUTE_ID
+, step.SHP_LG_SEQUENCE as STEP
+, start.SHP_LG_STOP_FACILITY_ID as ORIGEM_TRECHO
+, CASE WHEN finish.SHP_LG_STOP_FACILITY_ID = 'SC_ZS' THEN 'SSP1'
+ELSE finish.SHP_LG_STOP_FACILITY_ID END DESTINO_TRECHO
+, tu.SHP_LG_RELATED_ENTITY_ID as HU
+
+FROM `WHOWNER.BT_LG_MIDDLE_MILE_STEP` step
+LEFT JOIN `WHOWNER.BT_LG_MIDDLE_MILE_STOP` start on step.SHP_LG_STEP_ORIGIN_STOP_ID = start.SHP_LG_STOP_ID
+LEFT JOIN `WHOWNER.BT_LG_MIDDLE_MILE_STOP` finish on step.SHP_LG_STEP_DESTINATION_STOP_ID = finish.SHP_LG_STOP_ID
+LEFT JOIN `WHOWNER.BT_LG_MIDDLE_MILE_ORDER` dropoff on dropoff.ORD_ORDER_ID = start.DROPOFF_ORDER_ID and start.DROPOFF_ORDER_ID is not null
+LEFT JOIN `WHOWNER.BT_LG_MIDDLE_MILE_ORDER_TRANS_UNIT` tudo on tudo.ORD_ORDER_ID = dropoff.ORD_ORDER_ID
+LEFT join `WHOWNER.BT_LG_MIDDLE_MILE_TRANS_UNIT` tu on tu.SGP_LG_TRANSPORT_UNIT_ID = tudo.SGP_LG_TRANSPORT_UNIT_ID and tu.SHP_LG_RELATED_ENTITY_TYPE = 'pallet'
+
+WHERE 1=1
+
+and SHP_LG_STEP_CREATED_DTTM BETWEEN current_date - 60 and current_date
+and tu.SHP_LG_RELATED_ENTITY_ID is not null
+and step.SIT_SITE_ID = 'MLB'
+))
+
+SELECT DISTINCT
+lh.ROUTE_ID AS ROTA,
+lh.STEP as STEP,
+oot.FACILITY_ID AS ORIGEM_HU,
+lh.ORIGEM_TRECHO AS ORIGEM_TRECHO,
+COALESCE(mm.CPT_OFICIAL,mm.CPT) as ATD,
+PRAZO_ETA_DESTINO as ETA,
+mm.ETA_DESTINO_OFICIAL as ATA,
+lh.DESTINO_TRECHO as DESTINO,
+lh.HU as HU,
+ANALISE_ETA_DESTINO as SLA_ROTA,
+STATUS_ROTA,
+OCORRENCIA_ETA_DESTINO as OCORRENCIA
+
+from lh lh
+LEFT JOIN `TMP.mlb_brasil` mm on mm.ROUTE_ID = lh.ROUTE_ID and mm.STEP = lh.STEP
+left join `SHIPPING_BI.OPS_SHIPMENTS_STEPS_OOT` as oot on oot.HU_ID = lh.HU -- para v3 a tabela traz a origem real e o consolidador
+)
+
+SELECT DISTINCT
+
+t1.XD,
+t1.Picking_type,
+t1.Numero_do_pedido,
+t1.HU_Outbound,
+t1.Carrier,
+t1.Metodo_entrega,
+t1.Primeira_autorizacao,
+t1.Autorizacao_final,
+case 
+when t1.Transportadora = 'Mercado Envios' then 'OK' 
+when t1.Primeira_autorizacao is null then 'OK'
+when t1.Primeira_autorizacao = t1.Autorizacao_final then 'OK' else 'Reautorizado' end Reautorizacao,
+t1.Transportadora,
+t1.Cidade_seller,
+t1.Estado_seller,
+t1.Cust_ID,
+t1.Seller,
+t1.Receiver_State,
+t1.Receiver_Zip_Code,
+t1.Status,
+t1.sla_OOT,
+t1.HT,
+t1.HT_Deviation,
+t1.ST,
+t1.Lead_time,
+t1.Promessa_Original,
+t1.Promessa_Recalculada,
+t1.Promessa_final,
+t1.Criacao_do_pedido,
+t1.Pagamento,
+t1.Pronto_para_coleta,
+t1.Impressao_de_etiqueta,
+t1.Dropado,
+t1.Coletado,
+t1.In_HUB,
+t1.Shipped,
+t1.CPT,
+t1.Entrada_SVC,
+t1.Despacho_SVC,
+t1.Entrega,
+t1.Primeira_visita_Entrega,
+t1.Placa_LH,
+routelh.ROTA as Rota_LH,
+t1.Cidade_Buyer,
+t1.Place_id,
+t1.XPT,
+t2.Rota_FM,
+t1.Modal,
+t1.Destino_Step1,
+CASE WHEN step1_byroute.ROTA IS NULL THEN step1_byhu.ROTA ELSE step1_byroute.ROTA END ROTA_step1,
+CASE WHEN step1_byroute.ATD IS NULL THEN step1_byhu.ATD ELSE step1_byroute.ATD END ATD_step1,
+CASE WHEN step1_byroute.ETA IS NULL THEN step1_byhu.ETA ELSE step1_byroute.ETA END ETA_step1,
+CASE WHEN step1_byroute.ATA IS NULL THEN step1_byhu.ATA ELSE step1_byroute.ATA END ATA_step1,
+CASE WHEN step1_byroute.SLA_ROTA IS NULL THEN step1_byhu.SLA_ROTA ELSE step1_byroute.SLA_ROTA END SLA_ROTA_step1,
+CASE WHEN step1_byroute.STATUS_ROTA IS NULL THEN step1_byhu.STATUS_ROTA ELSE step1_byroute.STATUS_ROTA END STATUS_ROTA_step1,
+CASE WHEN step1_byroute.OCORRENCIA IS NULL THEN step1_byhu.OCORRENCIA ELSE step1_byroute.OCORRENCIA END OCORRENCIA_step1,
+t1.Inhub_Cons1,
+t1.HU_Cons1,
+t1.CPT_Cons1,
+t1.Shipped_Cons1,
+t1.Placa_LH_Cons1,
+t1.Destino_Step2,
+CASE WHEN step2_byroute.ROTA IS NULL THEN step2_byhu.ROTA ELSE step2_byroute.ROTA END ROTA_step2,
+CASE WHEN step2_byroute.ATD IS NULL THEN step2_byhu.ATD ELSE step2_byroute.ATD END ATD_step2,
+CASE WHEN step2_byroute.ETA IS NULL THEN step2_byhu.ETA ELSE step2_byroute.ETA END ETA_step2,
+CASE WHEN step2_byroute.ATA IS NULL THEN step2_byhu.ATA ELSE step2_byroute.ATA END ATA_step2,
+CASE WHEN step2_byroute.SLA_ROTA IS NULL THEN step2_byhu.SLA_ROTA ELSE step2_byroute.SLA_ROTA END SLA_ROTA_step2,
+CASE WHEN step2_byroute.STATUS_ROTA IS NULL THEN step2_byhu.STATUS_ROTA ELSE step2_byroute.STATUS_ROTA END STATUS_ROTA_step2,
+CASE WHEN step2_byroute.OCORRENCIA IS NULL THEN step2_byhu.OCORRENCIA ELSE step2_byroute.OCORRENCIA END OCORRENCIA_step2,
+t1.Inhub_Cons2,
+t1.HU_Cons2,
+t1.CPT_Cons2,
+t1.Shipped_Cons2,
+t1.Placa_LH_Cons2,
+t1.Destino_Step3,
+CASE WHEN step3_byroute.ROTA IS NULL THEN step3_byhu.ROTA ELSE step3_byroute.ROTA END ROTA_step3,
+CASE WHEN step3_byroute.ATD IS NULL THEN step3_byhu.ATD ELSE step3_byroute.ATD END ATD_step3,
+CASE WHEN step3_byroute.ETA IS NULL THEN step3_byhu.ETA ELSE step3_byroute.ETA END ETA_step3,
+CASE WHEN step3_byroute.ATA IS NULL THEN step3_byhu.ATA ELSE step3_byroute.ATA END ATA_step3,
+CASE WHEN step3_byroute.SLA_ROTA IS NULL THEN step3_byhu.SLA_ROTA ELSE step3_byroute.SLA_ROTA END SLA_ROTA_step3,
+CASE WHEN step3_byroute.STATUS_ROTA IS NULL THEN step3_byhu.STATUS_ROTA ELSE step3_byroute.STATUS_ROTA END STATUS_ROTA_step3,
+CASE WHEN step3_byroute.OCORRENCIA IS NULL THEN step3_byhu.OCORRENCIA ELSE step3_byroute.OCORRENCIA END OCORRENCIA_step3,
+CASE
+WHEN t1.Transportadora = 'Pat' THEN 'PATMG1'
+WHEN t1.Transportadora = 'Jad' THEN 'JADHUB'
+WHEN t1.Transportadora = 'Carva' THEN 'CVLHUB'
+WHEN t1.Transportadora = 'Log' THEN 'LOGHUB'
+WHEN t1.Transportadora = 'Seq' THEN 'SEQHUB'
+ELSE t1.Primeira_autorizacao END Destino_Final,
+t1.Cep_Seller
+
+from dados as t1
+left join FM as t2 on t1.Numero_do_pedido = t2.SHP_SHIPMENT_ID  
+LEFT JOIN MM as routelh on routelh.HU = t1.HU_Outbound and routelh.ORIGEM_TRECHO = t1.XD and routelh.STATUS_ROTA != 'CANCELED'
+LEFT JOIN MM as step1_byroute on routelh.ROTA = step1_byroute.ROTA and step1_byroute.DESTINO = t1.Destino_Step1 and step1_byroute.STATUS_ROTA != 'CANCELED'
+LEFT JOIN MM as step1_byhu on step1_byhu.HU = t1.HU_Outbound and step1_byhu.ORIGEM_HU = t1.XD and step1_byhu.DESTINO = t1.Destino_Step1 and step1_byhu.STATUS_ROTA != 'CANCELED'
+LEFT JOIN MM as routelh_step2 on routelh_step2.HU = t1.HU_Cons1 and routelh_step2.ORIGEM_TRECHO = t1.Destino_Step1 and routelh_step2.STATUS_ROTA != 'CANCELED'
+LEFT JOIN MM as step2_byroute on routelh_step2.ROTA = step2_byroute.ROTA and step2_byroute.DESTINO = t1.Destino_Step2 and step2_byroute.STATUS_ROTA != 'CANCELED'
+LEFT JOIN MM as step2_byhu on step2_byhu.HU = t1.HU_Cons1 and step2_byhu.ORIGEM_TRECHO = t1.Destino_Step1 and step2_byhu.DESTINO = t1.Destino_Step2 and step2_byhu.STATUS_ROTA != 'CANCELED'
+LEFT JOIN MM as routelh_step3 on routelh_step3.HU = t1.HU_Cons2 and routelh_step3.ORIGEM_TRECHO = t1.Destino_Step2 and routelh_step3.STATUS_ROTA != 'CANCELED'
+LEFT JOIN MM as step3_byroute on routelh_step3.ROTA = step3_byroute.ROTA and step3_byroute.DESTINO = t1.Destino_Step3 and step3_byroute.STATUS_ROTA != 'CANCELED'
+LEFT JOIN MM as step3_byhu on step3_byhu.HU = t1.HU_Cons2 and step3_byhu.ORIGEM_TRECHO = t1.Destino_Step2 and step3_byhu.DESTINO = t1.Destino_Step3 and step3_byhu.STATUS_ROTA != 'CANCELED'
