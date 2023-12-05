@@ -179,7 +179,7 @@ WHERE oot.STEP = 3 ) step3byshp on step3byshp.SHP_SHIPMENT_ID = a.SHP_SHIPMENT_I
 
 
 WHERE CAST(a.SHP_DATE_FIRST_VISIT as date) between '2022-12-09' AND '2022-12-12'
-AND d.shp_lg_facility_id IN ('SPR1')
+AND d.shp_lg_facility_id IN ('')
 AND c.sit_site_id = 'MLB'
 AND a.SHP_LEAD_TIME_DEVIATION_TYPE = 'delay'
 
