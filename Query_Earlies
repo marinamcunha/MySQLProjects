@@ -1,0 +1,55 @@
+With early as (
+
+SELECT
+t2.TMS_TR_LOGISTIC_CENTER_ID as XD, 
+t1.SHP_PICKING_TYPE_ID as Picking_type,
+COUNT(DISTINCT t1.shp_shipment_id) as Quantidade,
+t2.SHP_LABEL_CARRIER_NAME as Transportadora,
+t8.SHP_LG_FACILITY_ID as Destino,
+t3.cus_nickname as Seller,
+t6.SHP_HAND_TIME_DEVIATION_TYPE as HT,
+t6.SHP_TIME_DEVIATION_DAYS_TYPE as ST,
+t6.SHP_IN_HUB_TIME_DATE as Data_Inhub,
+EXTRACT(DAYOFWEEK FROM t7.est_delivery_date + interval '21' hour + interval'59' minute + interval '59' second) as Dia_Promessa,
+case when Entrega is not null then EXTRACT(DAYOFWEEK FROM Entrega) else EXTRACT(DAYOFWEEK FROM cast(coalesce(t1.shp_date_first_visit_id,t1.shp_date_delivered_id) as date)) end as Dia_Entrega
+
+from `WHOWNER.BT_SHP_SHIPMENTS` as t1
+
+left join  `WHOWNER.BT_TMS_TRACKING` as t2 on t1.shp_shipment_id = t2.shp_shipment_id and t2.sit_site_id = 'MLB' and cast (TMS_TR_COLLECT_LIST_DATE as date) >= (current_date - 60)
+left join `WHOWNER.LK_CUS_CUSTOMERS_DATA` as t3 on t1.shp_sender_id = t3.cus_cust_id
+left join `WHOWNER.LK_SHP_SHIPMENTS_TIMES` as t6 on t1.shp_shipment_id = t6.shp_shipment_id
+left join `WHOWNER.LK_SHP_ORIGINAL_PROMISE` as t7 on t1.shp_shipment_id = t7.shp_shipment_id
+left join `WHOWNER.BT_SHP_LG_SHIPMENTS` as t8 on t1.shp_shipment_id = t8.shp_shipment_id
+LEFT JOIN (
+  select 
+  SHP_SHIPMENT_ID,
+  MIN(SHP_LG_SHIPMENT_CHK_DT + interval'1' hour) as Entrega
+  from  `WHOWNER.BT_SHP_LG_SHIPMENT_CHECKPOINTS`
+  where SHP_LG_STATUS = 'on_route' AND SHP_LG_SUB_STATUS = 'delivered'
+  group by 1) DLV ON DLV.SHP_SHIPMENT_ID = t1.SHP_SHIPMENT_ID
+
+WHERE
+t1.SHP_PICKING_TYPE_ID in ('cross_docking','xd_drop_off')
+and t1.SHP_TYPE = 'forward'
+and t1.SIT_SITE_ID = 'MLB'
+and t6.SHP_LEAD_TIME_DEVIATION_TYPE = 'early'
+and t1.SHP_DATE_FIRST_VISIT_ID between '2023-05-28' and '2023-06-10' 
+and t2.TMS_TR_LOGISTIC_CENTER_ID in ()
+group by 1,2,4,5,6,7,8,9,10,11
+)
+
+
+SELECT
+
+t1.XD,
+t1.Picking_type,
+t1.Quantidade,
+case when t1.Destino is null then 'Commercial Carrier' else t1.Destino end Destino,
+t1.Seller,
+t1.HT,
+t1.ST,
+t1.Data_Inhub,
+case when t1.Dia_Promessa = 1 then 'domingo' when t1.Dia_Promessa = 2 then 'segunda-feira' when t1.Dia_Promessa = 3 then 'terça-feira' when t1.Dia_Promessa = 4 then 'quarta-feira' when t1.Dia_Promessa = 5 then 'quinta-feira' when t1.Dia_Promessa = 6 then 'sexta-feira' when t1.Dia_Promessa = 7 then 'sábado' else null end Dia_Promessa,
+case when t1.Dia_Entrega = 1 then 'domingo' when t1.Dia_Entrega = 2 then 'segunda-feira' when t1.Dia_Entrega = 3 then 'terça-feira' when t1.Dia_Entrega = 4 then 'quarta-feira' when t1.Dia_Entrega = 5 then 'quinta-feira' when t1.Dia_Entrega = 6 then 'sexta-feira' when t1.Dia_Entrega = 7 then 'sábado' else null end Dia_Entrega
+
+from early as t1
